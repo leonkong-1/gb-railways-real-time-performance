@@ -50,6 +50,8 @@ returns all TOCs currently in the store, regardless of delay status.
 capped at 500 (practical display limit). When a TOC is selected, limit removed so
 all services for that TOC are shown (even low/zero delay ones if min_delay=0).
 
-## Hosting (future)
-GitHub Pages not viable (no backend). Options discussed: Fly.io, Railway, Render
-(all support Python + persistent background threads). See README for deployment notes.
+## Hosting
+Deployed on Railway (GitHub push deploy, auto-redeploys on push to master).
+Live: https://gb-railways-real-time-performance-production.up.railway.app/
+CORPUSExtract.json committed to repo (open data, free to redistribute) so Railway
+bakes it in at build time. fly.toml kept in repo as a Fly.io fallback option.

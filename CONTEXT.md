@@ -9,10 +9,12 @@ Built for control room and performance staff — needs to be fast to read, not b
 
 ## Current state
 - Phase 2 running: continuous Kafka consumption, PHASE1_INGEST_SECONDS=0 in .env
-- Port 8001 (8000 is reserved by Claude Code IDE server — never use 8000)
+- Port 8001 locally (8000 is reserved by Claude Code IDE server — never use 8000)
 - All 6 QC checks pass on live rolling data (verified March 2026)
-- toc_ref.csv generated (TOC operator names loaded)
-- CORPUSExtract.json in "Reference data/" subfolder (auto-detected by reference.py)
+- toc_ref.csv generated (213 codes — both Business Code and numeric Sector Code)
+- CORPUSExtract.json committed to repo under "Reference data/" (open data)
+- Deployed on Railway: https://gb-railways-real-time-performance-production.up.railway.app/
+- GitHub repo: https://github.com/leonkong-1/gb-railways-real-time-performance
 
 ## How to start
 ```
