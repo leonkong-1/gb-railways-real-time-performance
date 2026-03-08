@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GB Train Performance</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #000;
+  --bg-card:   #111;
+  --bg-row:    #0a0a0a;
+  --bg-hover:  #161616;
+  --sep:        rgba(255,255,255,0.08);
+  --sep-strong: rgba(255,255,255,0.14);
+  --text-1:    #f5f5f7;
+  --text-2:    #a1a1a6;
+  --text-3:    #636366;
+  --green:     #30d158;
+  --amber:     #ff9f0a;
+  --red:       #ff453a;
+  --blue:      #0a84ff;
+  --purple:    #bf5af2;
+  --font: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text-1);
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.4;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Header ──────────────────────────────────────────────────── */
+#header {
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  border-bottom: 1px solid var(--sep);
+  background: rgba(0,0,0,0.8);
+  backdrop-filter: saturate(180%) blur(20px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+#header h1 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-1);
+  letter-spacing: -0.2px;
+  flex-shrink: 0;
+}
+#window-label { color: var(--text-3); font-size: 11px; }
+#refresh-ts   { color: var(--text-3); font-size: 11px; margin-left: auto; }
+
+#feed-status  { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-2); }
+#feed-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+}
+#feed-dot.degraded { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+#feed-dot.phase1   { background: var(--blue);  box-shadow: 0 0 6px var(--blue);  }
+
+/* ── Banners ──────────────────────────────────────────────────── */
+#stale-banner {
+  display: none;
+  background: rgba(255,159,10,0.12);
+  color: var(--amber);
+  padding: 8px 24px;
+  font-size: 12px;
+  font-weight: 500;
+  border-bottom: 1px solid rgba(255,159,10,0.2);
+}
+#phase1-banner {
+  display: none;
+  background: rgba(10,132,255,0.1);
+  color: var(--blue);
+  padding: 7px 24px;
+  font-size: 11px;
+  border-bottom: 1px solid rgba(10,132,255,0.2);
+}
+
+/* ── Summary stats ──────────────────────────────────────────── */
+#summary-row {
+  display: flex;
+  gap: 1px;
+  background: var(--sep);
+  border-bottom: 1px solid var(--sep);
+}
+.stat-box {
+  flex: 1;
+  padding: 16px 20px;
+  background: var(--bg);
+  min-width: 100px;
+}
+.stat-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 4px;
+}
+.stat-value {
+  font-size: 26px;
+  font-weight: 300;
+  letter-spacing: -1px;
+  color: var(--text-1);
+}
+.stat-box.delayed  .stat-value { color: var(--amber); }
+.stat-box.cancelled .stat-value { color: var(--red); }
+.stat-box.offroute  .stat-value { color: var(--purple); }
+
+/* ── Filter bar ──────────────────────────────────────────────── */
+#filter-bar {
+  display: flex;
+  gap: 16px;
+  padding: 10px 24px;
+  align-items: center;
+  border-bottom: 1px solid var(--sep);
+  flex-wrap: wrap;
+  background: var(--bg);
+}
+#filter-bar label {
+  font-size: 12px;
+  color: var(--text-2);
+}
+#filter-bar select {
+  background: var(--bg-card);
+  color: var(--text-1);
+  border: 1px solid var(--sep-strong);
+  padding: 5px 10px;
+  font-size: 12px;
+  font-family: var(--font);
+  border-radius: 8px;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  outline: none;
+}
+#filter-bar select:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(10,132,255,0.2);
+}
+#include-terminated-label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--text-2); cursor: pointer;
+}
+#include-terminated-label input { cursor: pointer; accent-color: var(--blue); }
+
+/* ── Table ───────────────────────────────────────────────────── */
+#main-table-wrap { overflow-x: auto; }
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 820px;
+}
+thead th {
+  background: var(--bg);
+  color: var(--text-3);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 9px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--sep-strong);
+  white-space: nowrap;
+}
+tbody tr {
+  border-bottom: 1px solid var(--sep);
+  cursor: pointer;
+  transition: background 0.08s;
+}
+tbody tr:hover { background: var(--bg-hover); }
+tbody td { padding: 9px 16px; white-space: nowrap; }
+
+/* Delay severity rows — subtle tint only */
+tr.row-amber td:first-child { border-left: 2px solid var(--amber); }
+tr.row-red   td:first-child { border-left: 2px solid var(--red); }
+
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.badge-cancelled  { background: rgba(255,69,58,0.15);  color: var(--red);    }
+.badge-terminated { background: rgba(10,132,255,0.12); color: var(--blue);   }
+.badge-offroute   { background: rgba(191,90,242,0.15); color: var(--purple); }
+
+/* Trend */
+.trend-improving { color: var(--green); }
+.trend-worsening { color: var(--red); }
+.trend-stable    { color: var(--amber); }
+.trend-unknown   { color: var(--text-3); }
+
+/* Delay values */
+.delay-positive { color: var(--red); }
+.delay-negative { color: var(--green); }
+.delay-zero     { color: var(--text-2); }
+
+.muted { color: var(--text-3); font-size: 11px; }
+.copy-id {
+  color: var(--text-3);
+  text-decoration: none;
+  font-size: 10px;
+  font-family: "SF Mono", "Menlo", monospace;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  border-bottom: none;
+}
+.copy-id:hover { color: var(--text-2); }
+
+/* ── Empty / loading states ──────────────────────────────────── */
+.empty-state { text-align: center; color: var(--text-3); padding: 60px; font-size: 13px; }
+#loading { display: none; text-align: center; padding: 40px; color: var(--text-3); }
+
+/* ── Drilldown view ──────────────────────────────────────────── */
+#drilldown-view { display: none; }
+
+#drilldown-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--sep);
+  flex-wrap: wrap;
+  background: var(--bg);
+  position: sticky;
+  top: 49px;
+  z-index: 10;
+}
+
+#back-btn, #refresh-drilldown-btn {
+  background: var(--bg-card);
+  color: var(--text-1);
+  border: 1px solid var(--sep-strong);
+  padding: 6px 14px;
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 8px;
+  outline: none;
+  transition: background 0.1s;
+}
+#back-btn:hover, #refresh-drilldown-btn:hover { background: var(--bg-hover); }
+
+#drilldown-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-1);
+  letter-spacing: -0.2px;
+}
+#drilldown-meta {
+  font-size: 12px;
+  color: var(--text-2);
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-top: 3px;
+}
+#drilldown-meta span { display: flex; gap: 4px; }
+
+#drilldown-table-wrap { overflow-x: auto; }
+
+.row-non-movement { color: var(--text-3); font-style: italic; }
+
+/* ── Scrollbar (WebKit) ──────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--sep-strong); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div id="header">
+  <h1>GB Train Performance</h1>
+  <span id="window-label"></span>
+  <div id="feed-status">
+    <span id="feed-dot"></span>
+    <span id="feed-label">Connecting…</span>
+  </div>
+  <span id="refresh-ts"></span>
+</div>
+
+<!-- Banners -->
+<div id="stale-banner">Feed may be stalled — data may not be current.</div>
+<div id="phase1-banner">Snapshot mode — data is fixed from ingest window. Restart to capture fresh data.</div>
+
+<!-- ════════════════════ LEADERBOARD VIEW ════════════════════ -->
+<div id="leaderboard-view">
+
+  <div id="summary-row">
+    <div class="stat-box">
+      <div class="stat-label">Services tracked</div>
+      <div class="stat-value" id="stat-total">—</div>
+    </div>
+    <div class="stat-box delayed">
+      <div class="stat-label">Delayed</div>
+      <div class="stat-value" id="stat-delayed">—</div>
+    </div>
+    <div class="stat-box cancelled">
+      <div class="stat-label">Cancelled</div>
+      <div class="stat-value" id="stat-cancelled">—</div>
+    </div>
+    <div class="stat-box offroute">
+      <div class="stat-label">Off Route</div>
+      <div class="stat-value" id="stat-offroute">—</div>
+    </div>
+  </div>
+
+  <div id="filter-bar">
+    <label for="toc-select">Operator</label>
+    <select id="toc-select"><option value="">All operators</option></select>
+
+    <label for="delay-select">Min delay</label>
+    <select id="delay-select">
+      <option value="0">Any</option>
+      <option value="3" selected>3 min+</option>
+      <option value="5">5 min+</option>
+      <option value="10">10 min+</option>
+    </select>
+
+    <label id="include-terminated-label">
+      <input type="checkbox" id="include-terminated"> Include terminated
+    </label>
+  </div>
+
+  <div id="main-table-wrap">
+    <div id="loading">Loading…</div>
+    <table id="results-table">
+      <thead>
+        <tr>
+          <th>TRUST ID</th>
+          <th>Headcode</th>
+          <th>Operator</th>
+          <th>Last Location</th>
+          <th>Worst Delay</th>
+          <th>Latest Delay</th>
+          <th>Trend</th>
+          <th>Status</th>
+          <th title="Qualifying timing-point messages">Msgs</th>
+          <th>Last Seen</th>
+        </tr>
+      </thead>
+      <tbody id="results-body"></tbody>
+    </table>
+    <div id="empty-state" class="empty-state" style="display:none">
+      No services match the current filters.
+    </div>
+  </div>
+
+</div><!-- /leaderboard-view -->
+
+<!-- ════════════════════ DRILLDOWN VIEW ═════════════════════ -->
+<div id="drilldown-view">
+  <div id="drilldown-header">
+    <button id="back-btn">← Back</button>
+    <button id="refresh-drilldown-btn">↻ Refresh</button>
+    <div>
+      <div id="drilldown-title">—</div>
+      <div id="drilldown-meta"></div>
+    </div>
+  </div>
+  <div id="drilldown-table-wrap">
+    <table id="drilldown-table">
+      <thead>
+        <tr>
+          <th>Time (actual)</th>
+          <th>Location</th>
+          <th>Event</th>
+          <th>Platform</th>
+          <th>Planned (GBTT)</th>
+          <th>Delay</th>
+          <th title="Delay monitoring point">T.P.</th>
+          <th>Type</th>
+        </tr>
+      </thead>
+      <tbody id="drilldown-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// State
+// ══════════════════════════════════════════════════════════════
+const state = {
+  currentToc: '',
+  currentMinDelay: 3,
+  includeTerminated: false,
+  currentTrainId: null,
+  refreshTimer: null,
+  healthTimer: null,
+};
+
+// ══════════════════════════════════════════════════════════════
+// Utilities
+// ══════════════════════════════════════════════════════════════
+function escHtml(s) {
+  if (!s) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function fmtDelay(mins) {
+  if (mins === null || mins === undefined) return '—';
+  const sign = mins >= 0 ? '+' : '';
+  return `${sign}${mins.toFixed(1)} min`;
+}
+
+function fmtDelayCell(mins) {
+  if (mins === null || mins === undefined) return `<span class="muted">—</span>`;
+  if (mins > 0) return `<span class="delay-positive">+${mins.toFixed(1)} min</span>`;
+  if (mins < 0) return `<span class="delay-negative">${mins.toFixed(1)} min</span>`;
+  return `<span class="delay-zero">0.0 min</span>`;
+}
+
+function fmtTrend(trend) {
+  const map = {
+    'IMPROVING': `<span class="trend-improving">↓ Improving</span>`,
+    'WORSENING': `<span class="trend-worsening">↑ Worsening</span>`,
+    'STABLE':    `<span class="trend-stable">→ Stable</span>`,
+    'UNKNOWN':   `<span class="trend-unknown">Unknown</span>`,
+  };
+  return map[trend] || `<span class="trend-unknown">${escHtml(trend)}</span>`;
+}
+
+function fmtRelTime(isoStr) {
+  if (!isoStr) return '—';
+  const diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
+  if (diff < 10) return 'just now';
+  if (diff < 60) return `${diff}s ago`;
+  const mins = Math.floor(diff / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  return `${hrs}h ${mins % 60}m ago`;
+}
+
+function fmtTime(isoStr) {
+  if (!isoStr) return '—';
+  try {
+    const d = new Date(isoStr);
+    return d.toUTCString().slice(17, 22); // HH:MM
+  } catch { return isoStr; }
+}
+
+function fmtTimeFull(isoStr) {
+  if (!isoStr) return '—';
+  try {
+    const d = new Date(isoStr);
+    return d.toUTCString().slice(17, 25); // HH:MM:SS
+  } catch { return isoStr; }
+}
+
+function rowClass(svc) {
+  if (svc.cancelled || svc.off_route) return '';
+  const w = svc.worst_delay_mins;
+  if (w === null || w === undefined) return '';
+  if (w >= 10) return 'row-red';
+  if (w >= 3)  return 'row-amber';
+  return '';
+}
+
+function statusBadges(svc) {
+  let b = '';
+  if (svc.cancelled)  b += `<span class="badge badge-cancelled">Cancelled</span> `;
+  if (svc.terminated) b += `<span class="badge badge-terminated">Terminated</span> `;
+  if (svc.off_route)  b += `<span class="badge badge-offroute">Off Route</span> `;
+  if (!b && svc.variation_status) b = escHtml(svc.variation_status);
+  return b || '—';
+}
+
+const MSG_NAMES = {
+  '0001': 'Activation',
+  '0002': 'Cancellation',
+  '0005': 'Reinstatement',
+  '0006': 'Change of Origin',
+  '0007': 'Change of Identity',
+  '0008': 'Change of Location',
+};
+
+// ══════════════════════════════════════════════════════════════
+// TOC dropdown — populated from /api/tocs (all operators in
+// store, regardless of delay status or current filter).
+// ══════════════════════════════════════════════════════════════
+async function loadTocDropdown() {
+  try {
+    const resp = await fetch('/api/tocs');
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const sel = document.getElementById('toc-select');
+    const current = sel.value;
+
+    // Rebuild only if list changed.
+    const incoming = data.tocs.map(t => t.toc_id).join(',');
+    const existing = [...sel.options].slice(1).map(o => o.value).join(',');
+    if (incoming === existing) return;
+
+    while (sel.options.length > 1) sel.remove(1);
+    for (const t of data.tocs) {
+      const opt = document.createElement('option');
+      opt.value = t.toc_id;
+      opt.textContent = t.toc_name !== t.toc_id
+        ? `${t.toc_name} (${t.toc_id})`
+        : t.toc_id;
+      sel.add(opt);
+    }
+    sel.value = current; // restore selection
+  } catch (_) {}
+}
+
+// ══════════════════════════════════════════════════════════════
+// Health polling
+// ══════════════════════════════════════════════════════════════
+async function pollHealth() {
+  try {
+    const resp = await fetch('/api/health');
+    const h = await resp.json();
+    const dot   = document.getElementById('feed-dot');
+    const label = document.getElementById('feed-label');
+
+    if (h.status === 'ok') {
+      dot.className = '';
+      label.textContent = 'Feed live';
+      document.getElementById('stale-banner').style.display = 'none';
+    } else if (h.phase1_complete || h.status === 'phase1_complete') {
+      dot.className = 'phase1';
+      label.textContent = `Snapshot — ${(h.messages_consumed_total || 0).toLocaleString()} messages`;
+      document.getElementById('stale-banner').style.display = 'none';
+      document.getElementById('phase1-banner').style.display = 'block';
+    } else {
+      dot.className = 'degraded';
+      label.textContent = 'Feed degraded';
+      document.getElementById('stale-banner').style.display = 'block';
+    }
+  } catch (_) {}
+}
+
+// ══════════════════════════════════════════════════════════════
+// Leaderboard
+// ══════════════════════════════════════════════════════════════
+async function loadLeaderboard() {
+  const toc         = state.currentToc;
+  const minDelay    = state.currentMinDelay;
+  const inclTerm    = state.includeTerminated;
+
+  // When a single TOC is selected, remove the limit so all their
+  // services appear (not just those that happen to be in the top-500
+  // network view). For the full-network view cap at 500.
+  const limit = toc ? 2000 : 500;
+
+  let url = `/api/performance?min_delay=${minDelay}&include_terminated=${inclTerm}&limit=${limit}`;
+  if (toc) url += `&toc_id=${encodeURIComponent(toc)}`;
+
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(resp.statusText);
+    renderLeaderboard(await resp.json());
+  } catch (e) {
+    console.error('Leaderboard load failed:', e);
+  }
+}
+
+function renderLeaderboard(data) {
+  // Summary stats.
+  document.getElementById('stat-total').textContent    = (data.store_summary.total_services || 0).toLocaleString();
+  document.getElementById('stat-delayed').textContent   = (data.store_summary.delayed_count  || 0).toLocaleString();
+  document.getElementById('stat-cancelled').textContent = (data.store_summary.cancelled_count || 0).toLocaleString();
+  document.getElementById('stat-offroute').textContent  = (data.store_summary.off_route_count || 0).toLocaleString();
+
+  // Window label.
+  const wc = data.window_config;
+  document.getElementById('window-label').textContent =
+    `${wc.max_age_minutes} min window`;
+
+  // Refresh timestamp.
+  document.getElementById('refresh-ts').textContent =
+    `Updated ${fmtTimeFull(data.generated_at)} UTC`;
+
+  // Save/restore scroll.
+  const wrap = document.getElementById('main-table-wrap');
+  const savedScroll = wrap.scrollTop;
+
+  // Rows.
+  const tbody = document.getElementById('results-body');
+  const empty = document.getElementById('empty-state');
+
+  if (!data.results || !data.results.length) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  tbody.innerHTML = data.results.map(svc => {
+    const cls = rowClass(svc);
+    // TRUST ID: monospace, click-to-copy
+    const trustIdHtml = `<a class="copy-id" href="javascript:void(0)"
+      onclick="event.stopPropagation();navigator.clipboard.writeText('${escHtml(svc.train_id)}');this.textContent='Copied!';setTimeout(()=>this.textContent='${escHtml(svc.train_id)}',1500)"
+      title="Click to copy TRUST ID">${escHtml(svc.train_id)}</a>`;
+    return `<tr class="${cls}" data-train-id="${escHtml(svc.train_id)}">
+      <td>${trustIdHtml}</td>
+      <td style="font-weight:600">${escHtml(svc.headcode)}</td>
+      <td>${escHtml(svc.operator || svc.toc_id)}</td>
+      <td>${escHtml(svc.last_known_location) || '<span class="muted">—</span>'}</td>
+      <td>${fmtDelayCell(svc.worst_delay_mins)}</td>
+      <td>${fmtDelayCell(svc.latest_delay_mins)}</td>
+      <td>${fmtTrend(svc.trend)}</td>
+      <td>${statusBadges(svc)}</td>
+      <td class="muted">${svc.qualifying_message_count}</td>
+      <td class="muted">${fmtRelTime(svc.last_seen)}</td>
+    </tr>`;
+  }).join('');
+
+  wrap.scrollTop = savedScroll;
+
+  tbody.querySelectorAll('tr[data-train-id]').forEach(tr => {
+    tr.addEventListener('click', () => openDrilldown(tr.dataset.trainId));
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// Drilldown
+// ══════════════════════════════════════════════════════════════
+async function openDrilldown(trainId) {
+  state.currentTrainId = trainId;
+  document.getElementById('leaderboard-view').style.display = 'none';
+  document.getElementById('drilldown-view').style.display = 'block';
+  clearInterval(state.refreshTimer);
+  await loadDrilldown(trainId);
+}
+
+async function loadDrilldown(trainId) {
+  document.getElementById('drilldown-title').textContent = `Loading ${trainId}…`;
+  document.getElementById('drilldown-body').innerHTML = '';
+  document.getElementById('drilldown-meta').innerHTML = '';
+  try {
+    const resp = await fetch(`/api/service/${encodeURIComponent(trainId)}`);
+    if (!resp.ok) throw new Error(resp.statusText);
+    renderDrilldown(await resp.json());
+  } catch (e) {
+    document.getElementById('drilldown-title').textContent = `Error loading ${trainId}`;
+    console.error(e);
+  }
+}
+
+function renderDrilldown(data) {
+  const s = data.summary;
+  document.getElementById('drilldown-title').textContent =
+    `${data.headcode}  ·  ${data.operator || data.toc_id}  ·  ${data.train_id}`;
+
+  const metaParts = [
+    s.worst_delay_mins !== null  ? `<span>Worst <strong>${fmtDelay(s.worst_delay_mins)}</strong></span>` : '',
+    s.latest_delay_mins !== null ? `<span>Latest <strong>${fmtDelay(s.latest_delay_mins)}</strong></span>` : '',
+    `<span>Trend <strong>${s.trend}</strong></span>`,
+    s.variation_status           ? `<span>${escHtml(s.variation_status)}</span>` : '',
+    s.cancelled  ? `<span style="color:var(--red);font-weight:600">Cancelled</span>` : '',
+    s.terminated ? `<span style="color:var(--blue);font-weight:600">Terminated</span>` : '',
+    s.off_route  ? `<span style="color:var(--purple);font-weight:600">Off Route</span>` : '',
+    `<span class="muted">${s.message_count} msgs (${s.qualifying_message_count} qualifying)</span>`,
+  ].filter(Boolean).join('');
+  document.getElementById('drilldown-meta').innerHTML = metaParts;
+
+  const tbody = document.getElementById('drilldown-body');
+  if (!data.events || !data.events.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No events.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = data.events.map(ev => {
+    if (ev.msg_type !== '0003') {
+      return `<tr class="row-non-movement">
+        <td class="muted">${fmtTimeFull(ev.actual_timestamp_iso || ev.received_at)}</td>
+        <td colspan="6" style="color:var(--purple)">${escHtml(MSG_NAMES[ev.msg_type] || ev.msg_type)}</td>
+        <td><span class="badge badge-offroute">${escHtml(ev.msg_type)}</span></td>
+      </tr>`;
+    }
+
+    const delayCls = ev.computed_delay_mins !== null
+      ? (ev.computed_delay_mins >= 10 ? 'row-red' : ev.computed_delay_mins >= 3 ? 'row-amber' : '')
+      : '';
+    const tpMark  = ev.delay_monitoring_point
+      ? `<span style="color:var(--green);font-weight:600">✓</span>` : '';
+    const wttNote = ev.reference_time_used === 'planned'
+      ? ` <span class="muted" title="WTT fallback">(WTT)</span>` : '';
+    const delayCell = ev.computed_delay_mins !== null
+      ? fmtDelayCell(ev.computed_delay_mins) + wttNote
+      : '<span class="muted">—</span>';
+
+    return `<tr class="${delayCls}">
+      <td>${fmtTimeFull(ev.actual_timestamp)}</td>
+      <td>${escHtml(ev.location || ev.stanox) || '<span class="muted">—</span>'}</td>
+      <td class="muted">${escHtml(ev.event_type) || '—'}</td>
+      <td class="muted">${escHtml(ev.platform) || '—'}</td>
+      <td class="muted">${ev.gbtt_timestamp ? fmtTimeFull(ev.gbtt_timestamp) : '<span class="muted">—</span>'}</td>
+      <td>${delayCell}</td>
+      <td style="text-align:center">${tpMark}</td>
+      <td><span class="badge badge-terminated">0003</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+// Navigation
+// ══════════════════════════════════════════════════════════════
+function goBack() {
+  document.getElementById('drilldown-view').style.display = 'none';
+  document.getElementById('leaderboard-view').style.display = 'block';
+  state.currentTrainId = null;
+  loadLeaderboard();
+  startLeaderboardRefresh();
+}
+
+function startLeaderboardRefresh() {
+  clearInterval(state.refreshTimer);
+  state.refreshTimer = setInterval(() => {
+    loadLeaderboard();
+    loadTocDropdown();
+  }, 15000);
+}
+
+// ══════════════════════════════════════════════════════════════
+// Event wiring
+// ══════════════════════════════════════════════════════════════
+document.getElementById('toc-select').addEventListener('change', function() {
+  state.currentToc = this.value;
+  loadLeaderboard();
+});
+document.getElementById('delay-select').addEventListener('change', function() {
+  state.currentMinDelay = parseInt(this.value, 10);
+  loadLeaderboard();
+});
+document.getElementById('include-terminated').addEventListener('change', function() {
+  state.includeTerminated = this.checked;
+  loadLeaderboard();
+});
+document.getElementById('back-btn').addEventListener('click', goBack);
+document.getElementById('refresh-drilldown-btn').addEventListener('click', () => {
+  if (state.currentTrainId) loadDrilldown(state.currentTrainId);
+});
+
+// ══════════════════════════════════════════════════════════════
+// Init
+// ══════════════════════════════════════════════════════════════
+(async function init() {
+  await Promise.all([loadLeaderboard(), loadTocDropdown(), pollHealth()]);
+  startLeaderboardRefresh();
+  state.healthTimer = setInterval(pollHealth, 30000);
+})();
+</script>
+</body>
+</html>
