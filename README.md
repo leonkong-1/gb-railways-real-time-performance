@@ -192,10 +192,52 @@ tie-breaking consistent between aggregation and QC checks.
 
 ## Hosting
 
-GitHub Pages is not viable (no backend). Platforms that support Python with persistent
-background threads: **Fly.io**, **Railway**, **Render**. All can run this app with minimal
-configuration — a `Procfile` or `Dockerfile` pointing to `python app.py` is sufficient.
-The app has no database dependency; the only runtime state is in-process memory.
+GitHub Pages is not viable (no backend). The app requires a persistent Python process
+for the Kafka consumer thread. A `Dockerfile` and `fly.toml` are included for
+**Fly.io** deployment (recommended).
+
+### Fly.io deployment
+
+Prerequisites: [Fly.io account](https://fly.io) + [flyctl CLI](https://fly.io/docs/hands-on/install-flyctl/) installed.
+
+```bash
+# 1. Authenticate
+fly auth login
+
+# 2. Deploy (fly.toml is already configured — skip the interactive setup)
+fly deploy
+
+# 3. Set secrets (Kafka credentials — never committed to the repo)
+fly secrets set \
+  KAFKA_BOOTSTRAP_SERVER="pkc-xxxxx.europe-west2.gcp.confluent.cloud:9092" \
+  KAFKA_USERNAME="your-api-key" \
+  KAFKA_PASSWORD="your-api-secret" \
+  KAFKA_CONSUMER_GROUP="your-consumer-group-id"
+
+# 4. Open the live app
+fly open
+```
+
+The app runs on Fly's `lhr` (London) region — closest to the Rail Data Marketplace
+Kafka cluster. `auto_stop_machines = false` and `min_machines_running = 1` in
+`fly.toml` ensure the VM stays alive for continuous Kafka consumption.
+
+> **Note on dual consumers**: if you also run the app locally while Fly.io is live,
+> both instances share the same Kafka consumer group and will split the message
+> partition between them. Use a different `KAFKA_CONSUMER_GROUP` locally (e.g. append
+> `-dev`) to avoid this.
+
+> **CORPUSExtract.json**: this file is not in the repository (requires NR registration).
+> Without it the app starts normally and shows raw STANOX codes instead of location names.
+> To add it: download from Rail Data Marketplace, then use `fly sftp` or bake it into
+> the image via a `Reference data/` folder added to your local build before `fly deploy`.
+
+### Alternative platforms
+
+| Platform | Notes |
+|---|---|
+| **Railway** | GitHub push deploy, very simple; set env vars in dashboard |
+| **Render** | Free tier spins down on inactivity — breaks the Kafka consumer; use paid plan |
 
 ---
 

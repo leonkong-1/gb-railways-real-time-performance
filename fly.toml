@@ -1,0 +1,20 @@
+# fly.toml — Fly.io deployment configuration
+# Generated for: gb-railways-real-time-performance
+# Docs: https://fly.io/docs/reference/configuration/
+
+app = "gb-railways-real-time-performance"
+primary_region = "lhr"  # London — closest to the Rail Data Marketplace Kafka cluster
+
+[build]
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false   # IMPORTANT: keep alive for continuous Kafka consumption
+  auto_start_machines = true
+  min_machines_running = 1     # always one instance running
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
