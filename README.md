@@ -65,7 +65,9 @@ https://raildata.org.uk/dataProduct/P-9d26e657-26be-496b-b669-93b217d45859/overv
 
 **Where to place it**: project root OR `Reference data/` subfolder (auto-detected).
 
-This file is excluded from the repository (large binary, requires registration).
+`CORPUSExtract.json` is committed to this repository under `Reference data/` — it is
+open data and free to redistribute. Re-download from the source above if you need a
+fresher copy.
 
 ### 2. TOC operator names — `toc_ref.csv`
 
@@ -192,15 +194,13 @@ tie-breaking consistent between aggregation and QC checks.
 
 ## Hosting
 
+**Live deployment**: https://gb-railways-real-time-performance-production.up.railway.app/
+
 GitHub Pages is not viable (no backend). The app requires a persistent Python process
-for the Kafka consumer thread.
+for the Kafka consumer thread. This deployment runs on [Railway](https://railway.app)
+(GitHub push deploy, auto-redeploys on every push to `main`, ~$5/month).
 
-### Railway deployment (recommended)
-
-[Railway](https://railway.app) is the simplest option — GitHub push deploy, no CLI required.
-Pricing: ~$5/month (usage-based, no free tier after trial).
-
-**Steps:**
+### Deploying your own instance on Railway
 
 1. **Create project** — Railway dashboard → New Project → Deploy from GitHub repo →
    select your fork of this repo.
@@ -223,17 +223,10 @@ Pricing: ~$5/month (usage-based, no free tier after trial).
 4. **Get your URL** — Service → Settings → Networking → Generate Domain.
    Verify with `https://your-app.up.railway.app/api/health`.
 
-5. **Auto-deploy on push** — every `git push` to `main` triggers a new Railway deploy.
-
 > **Note on dual consumers**: if you also run the app locally while Railway is live,
 > both instances share the same Kafka consumer group and will split the message
 > partition between them. Use a different `KAFKA_CONSUMER_GROUP` locally (e.g. append
 > `-dev`) to avoid this.
-
-> **CORPUSExtract.json**: this file is not in the repository (requires NR registration).
-> Without it the app starts normally and shows raw STANOX codes instead of location names.
-> To add it: commit the file into a `Reference data/` subfolder before pushing — Railway
-> will bake it into the image at build time.
 
 ### Alternative platforms
 
