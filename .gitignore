@@ -2,10 +2,6 @@
 .env
 Credentials/
 
-# Reference data — large binary requiring NR registration
-# Download from Network Rail open data portal (search "CORPUS")
-# and place in "Reference data/" or project root
-Reference data/CORPUSExtract.json
 
 # Generated
 __pycache__/
