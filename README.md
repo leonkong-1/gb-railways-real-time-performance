@@ -33,6 +33,26 @@ python app.py                      # starts on http://localhost:8001
 
 ---
 
+## Data sources
+
+### Live train movement feed
+
+**TRUST Train Movements** from Rail Data Marketplace:
+https://raildata.org.uk/dataProduct/P-826477b8-3789-45e7-85bd-22c4ae9bcfae/overview
+
+Consumed via Confluent Cloud Kafka (SASL_SSL). Topic: `TRAIN_MVT_ALL_TOC`.
+Message types used: 0001 (Activation), 0002 (Cancellation), 0003 (Movement),
+0005 (Reinstatement), 0006 (Change of Origin), 0007 (Change of Identity).
+
+**No other real-time data sources are used.** In particular, this project does not
+consume the Darwin feed. Darwin is often more up-to-date than TRUST for passenger
+information (Darwin aggregates multiple sources; TRUST reflects signaller-reported
+movements which can lag slightly). TRUST was chosen here because its message structure
+is simpler and more directly suited to a delay-metric MVP. This is an illustrative
+proof-of-concept, not a production performance monitoring system.
+
+---
+
 ## Reference data
 
 The app starts and functions without reference files — raw codes are shown instead of names.
@@ -40,16 +60,19 @@ The app starts and functions without reference files — raw codes are shown ins
 
 ### 1. STANOX location names — `CORPUSExtract.json`
 
-**Source**: Network Rail open data portal (free registration required).
-Search for "CORPUS" at https://www.networkrail.co.uk/who-we-are/transparency-and-ethics/transparency/open-data-feeds/
+**Source**: Rail Data Marketplace (free registration required):
+https://raildata.org.uk/dataProduct/P-9d26e657-26be-496b-b669-93b217d45859/overview
 
 **Where to place it**: project root OR `Reference data/` subfolder (auto-detected).
 
-This file is excluded from the repository (large binary, requires NR registration).
+This file is excluded from the repository (large binary, requires registration).
 
 ### 2. TOC operator names — `toc_ref.csv`
 
-**Source**: Open Rail Data community wiki, scraped by the provided script.
+**Source**: Open Rail Data community wiki:
+https://wiki.openraildata.com/index.php/TOC_Codes
+
+Scraped by the provided script:
 
 ```bash
 python scripts/fetch_toc_ref.py
