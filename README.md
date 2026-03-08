@@ -193,50 +193,53 @@ tie-breaking consistent between aggregation and QC checks.
 ## Hosting
 
 GitHub Pages is not viable (no backend). The app requires a persistent Python process
-for the Kafka consumer thread. A `Dockerfile` and `fly.toml` are included for
-**Fly.io** deployment (recommended).
+for the Kafka consumer thread.
 
-### Fly.io deployment
+### Railway deployment (recommended)
 
-Prerequisites: [Fly.io account](https://fly.io) + [flyctl CLI](https://fly.io/docs/hands-on/install-flyctl/) installed.
+[Railway](https://railway.app) is the simplest option — GitHub push deploy, no CLI required.
+Pricing: ~$5/month (usage-based, no free tier after trial).
 
-```bash
-# 1. Authenticate
-fly auth login
+**Steps:**
 
-# 2. Deploy (fly.toml is already configured — skip the interactive setup)
-fly deploy
+1. **Create project** — Railway dashboard → New Project → Deploy from GitHub repo →
+   select your fork of this repo.
 
-# 3. Set secrets (Kafka credentials — never committed to the repo)
-fly secrets set \
-  KAFKA_BOOTSTRAP_SERVER="pkc-xxxxx.europe-west2.gcp.confluent.cloud:9092" \
-  KAFKA_USERNAME="your-api-key" \
-  KAFKA_PASSWORD="your-api-secret" \
-  KAFKA_CONSUMER_GROUP="your-consumer-group-id"
+2. **Set environment variables** — Service → Variables tab:
 
-# 4. Open the live app
-fly open
-```
+   | Variable | Value |
+   |---|---|
+   | `KAFKA_BOOTSTRAP_SERVER` | your Confluent bootstrap server |
+   | `KAFKA_USERNAME` | your Kafka API key |
+   | `KAFKA_PASSWORD` | your Kafka API secret |
+   | `KAFKA_CONSUMER_GROUP` | your consumer group ID |
+   | `PHASE1_INGEST_SECONDS` | `0` |
 
-The app runs on Fly's `lhr` (London) region — closest to the Rail Data Marketplace
-Kafka cluster. `auto_stop_machines = false` and `min_machines_running = 1` in
-`fly.toml` ensure the VM stays alive for continuous Kafka consumption.
+   Railway injects `PORT` automatically; the app reads it at startup — no changes needed.
 
-> **Note on dual consumers**: if you also run the app locally while Fly.io is live,
+3. **Deploy** — Railway redeploys automatically once variables are saved. Watch the
+   build logs; it installs from `requirements.txt` and starts `python app.py`.
+
+4. **Get your URL** — Service → Settings → Networking → Generate Domain.
+   Verify with `https://your-app.up.railway.app/api/health`.
+
+5. **Auto-deploy on push** — every `git push` to `main` triggers a new Railway deploy.
+
+> **Note on dual consumers**: if you also run the app locally while Railway is live,
 > both instances share the same Kafka consumer group and will split the message
 > partition between them. Use a different `KAFKA_CONSUMER_GROUP` locally (e.g. append
 > `-dev`) to avoid this.
 
 > **CORPUSExtract.json**: this file is not in the repository (requires NR registration).
 > Without it the app starts normally and shows raw STANOX codes instead of location names.
-> To add it: download from Rail Data Marketplace, then use `fly sftp` or bake it into
-> the image via a `Reference data/` folder added to your local build before `fly deploy`.
+> To add it: commit the file into a `Reference data/` subfolder before pushing — Railway
+> will bake it into the image at build time.
 
 ### Alternative platforms
 
 | Platform | Notes |
 |---|---|
-| **Railway** | GitHub push deploy, very simple; set env vars in dashboard |
+| **Fly.io** | CLI-based deploy; `fly.toml` included; ~$2–3/month; paid only (trial, no free tier) |
 | **Render** | Free tier spins down on inactivity — breaks the Kafka consumer; use paid plan |
 
 ---
