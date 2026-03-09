@@ -281,6 +281,53 @@ tr.row-red   td:first-child { border-left: 2px solid var(--red); }
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--sep-strong); border-radius: 3px; }
+
+/* ── Info button + modal ─────────────────────────────────────── */
+#info-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 1px solid var(--text-3);
+  color: var(--text-3); font-size: 11px; font-weight: 600;
+  cursor: pointer; flex-shrink: 0;
+  user-select: none;
+  transition: border-color 0.15s, color 0.15s;
+}
+#info-btn:hover { border-color: var(--text-2); color: var(--text-2); }
+
+#info-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(4px);
+  z-index: 999;
+  align-items: center; justify-content: center;
+}
+#info-overlay.open { display: flex; }
+#info-modal {
+  background: var(--bg-card);
+  border: 1px solid var(--sep-strong);
+  border-radius: 14px;
+  padding: 28px 32px;
+  max-width: 480px;
+  width: calc(100% - 48px);
+  position: relative;
+}
+#info-modal h2 {
+  font-size: 15px; font-weight: 600; color: var(--text-1);
+  margin-bottom: 16px;
+}
+#info-modal p {
+  font-size: 13px; color: var(--text-2); line-height: 1.6;
+  margin-bottom: 12px;
+}
+#info-modal p:last-of-type { margin-bottom: 0; }
+#info-modal strong { color: var(--text-1); font-weight: 500; }
+#info-close {
+  position: absolute; top: 16px; right: 18px;
+  color: var(--text-3); font-size: 18px; cursor: pointer;
+  line-height: 1;
+}
+#info-close:hover { color: var(--text-1); }
 </style>
 </head>
 <body>
@@ -293,7 +340,20 @@ tr.row-red   td:first-child { border-left: 2px solid var(--red); }
     <span id="feed-dot"></span>
     <span id="feed-label">Connecting…</span>
   </div>
+  <span id="info-btn" title="About this dashboard" onclick="document.getElementById('info-overlay').classList.add('open')">i</span>
   <span id="refresh-ts"></span>
+</div>
+
+<!-- Info modal -->
+<div id="info-overlay" onclick="if(event.target===this)this.classList.remove('open')">
+  <div id="info-modal">
+    <span id="info-close" onclick="document.getElementById('info-overlay').classList.remove('open')">&times;</span>
+    <h2>Can't find a service?</h2>
+    <p>This dashboard holds data <strong>in memory only</strong> — nothing is saved to disk. Services are automatically removed to keep the view clean and the server fast.</p>
+    <p><strong>Cancelled or terminated services</strong> are kept for <strong>4 hours</strong> after their last update, then removed.</p>
+    <p><strong>Services that simply go quiet</strong> — where no cancellation or termination message was ever received from TRUST — are kept for <strong>8 hours</strong> after their last update, then removed.</p>
+    <p>If the server restarts, all data is lost and the dashboard rebuilds from live feed messages only.</p>
+  </div>
 </div>
 
 <!-- Banners -->

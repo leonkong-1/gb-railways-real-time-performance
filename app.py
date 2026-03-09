@@ -46,12 +46,13 @@ async def startup():
     # --- Configuration ---
     max_msgs = int(os.environ.get("WINDOW_MAX_MESSAGES_PER_SERVICE", "10"))
     max_age = int(os.environ.get("WINDOW_MAX_AGE_MINUTES", "240"))
+    max_age_zombie = int(os.environ.get("WINDOW_MAX_AGE_ZOMBIE_MINUTES", "480"))
     ingest_seconds = int(os.environ.get("PHASE1_INGEST_SECONDS", "120"))
 
     logger.info(
         "Starting with max_messages_per_service=%d, max_age_minutes=%d, "
-        "phase1_ingest_seconds=%d (0=continuous).",
-        max_msgs, max_age, ingest_seconds,
+        "max_age_zombie_minutes=%d, phase1_ingest_seconds=%d (0=continuous).",
+        max_msgs, max_age, max_age_zombie, ingest_seconds,
     )
 
     # --- Reference data ---
@@ -59,7 +60,12 @@ async def startup():
     ref.load_all()
 
     # --- Message store ---
-    store = MessageStore(max_messages_per_service=max_msgs, max_age_minutes=max_age)
+    store = MessageStore(
+        max_messages_per_service=max_msgs,
+        max_age_minutes=max_age,
+        max_age_zombie_minutes=max_age_zombie,
+    )
+    store.start_sweep(interval_seconds=600)  # background eviction every 10 min
 
     # --- Kafka consumer thread ---
     consumer = KafkaConsumerThread(store=store, ingest_seconds=ingest_seconds)
@@ -87,6 +93,9 @@ async def startup():
 
 @app.on_event("shutdown")
 async def shutdown():
+    store = getattr(app.state, "store", None)
+    if store:
+        store.stop_sweep()
     consumer = getattr(app.state, "consumer", None)
     if consumer:
         consumer.stop()
