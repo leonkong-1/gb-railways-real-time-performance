@@ -26,11 +26,15 @@ aggregation.py  →  routers/performance.py, service.py, qc.py
 reference.py    →  resolves toc_id → operator name, stanox → location name
 ```
 
-## Eviction (UPDATED post Phase 2)
+## Eviction (UPDATED — background sweep added)
 - Rule 1 (latest-N): ONLY for terminated services. Non-terminated keep ALL messages.
   Rationale: truncating active services to 10 msgs gave incomplete drilldown timelines.
-- Rule 2 (max-age): drop train_id if most-recent received_at > WINDOW_MAX_AGE_MINUTES (240).
-  Applies regardless of termination status.
+- Rule 2 (max-age): differentiated by service status:
+    - Cancelled or terminated: WINDOW_MAX_AGE_MINUTES (default 240 / 4 hrs)
+    - Zombie (no cancel/terminate ever received): WINDOW_MAX_AGE_ZOMBIE_MINUTES (default 480 / 8 hrs)
+- Background sweep: daemon thread runs _eviction_sweep() every 10 min, walking the entire
+  store. Fixes the original bug where Rule 2 only fired on append() — services that went
+  silent were never evicted.
 
 ## Delay calculation
 - Primary: actual_timestamp_ms - gbtt_timestamp_ms

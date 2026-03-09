@@ -96,24 +96,32 @@ script if the operator list changes.
 | `KAFKA_PASSWORD` | Yes | — | Kafka API secret |
 | `KAFKA_CONSUMER_GROUP` | Yes | — | Consumer group ID |
 | `WINDOW_MAX_MESSAGES_PER_SERVICE` | No | `10` | Max messages retained per train_id for **terminated** services |
-| `WINDOW_MAX_AGE_MINUTES` | No | `240` | Max age of last message before eviction (minutes) |
+| `WINDOW_MAX_AGE_MINUTES` | No | `240` | Max age before eviction for cancelled/terminated services (minutes) |
+| `WINDOW_MAX_AGE_ZOMBIE_MINUTES` | No | `480` | Max age before eviction for services with no cancel/terminate message (minutes) |
 | `PHASE1_INGEST_SECONDS` | No | `0` | Set > 0 for timed snapshot mode; `0` = continuous |
 | `PORT` | No | `8001` | HTTP port |
 | `REFERENCE_DATA_DIR` | No | `./` | Path to directory containing reference files |
 
 ### Eviction rules
 
-Two rules applied on every message append:
+Two rules, applied on every message append **and** via a background sweep every 10 minutes:
 
 1. **Latest-N per service** (`WINDOW_MAX_MESSAGES_PER_SERVICE`): only applied to
    **terminated** services. Non-terminated services keep **all** messages so their full
    station timeline is always visible in the drilldown. Rationale: truncating an active
    service to 10 messages produces confusing incomplete timelines.
 
-2. **Max age** (`WINDOW_MAX_AGE_MINUTES`): if the most-recent message for a `train_id`
-   is older than this threshold, the entire entry is evicted. Default is 240 minutes
-   (4 hours) rather than a shorter window, to accommodate Highland route services where
-   gaps between TRUST reporting points can exceed 90 minutes.
+2. **Max age**: if the most-recent message for a `train_id` is older than the threshold,
+   the entire entry is evicted. Threshold differs by service status:
+   - **Cancelled or terminated** (`WINDOW_MAX_AGE_MINUTES`, default 240 min / 4 hrs):
+     keeps recently-finished services visible for controllers to refer back to.
+   - **Zombie** — no cancellation or termination message ever received
+     (`WINDOW_MAX_AGE_ZOMBIE_MINUTES`, default 480 min / 8 hrs): longer window to avoid
+     prematurely dropping services that are legitimately between reporting points on
+     sparse routes (e.g. Highland lines).
+
+   The background sweep (daemon thread, 10-minute interval) ensures services that go
+   permanently silent are evicted even if no new messages arrive for them.
 
 ---
 

@@ -29,13 +29,15 @@ Then open http://localhost:8001
 4-character headcode ("2S65") is displayed for readability but IS NOT UNIQUE — recycled
 within the same day/TOC. TRUST ID is the join key everywhere in the data model and UI.
 
-### Eviction logic (post Phase 2 update)
+### Eviction logic (updated — background sweep added March 2026)
 - Non-terminated services: keep ALL messages (no per-service message limit).
 - Terminated services: apply Rule 1 (latest-N) to free memory.
-- Rule 2 (max age): drop any train_id whose most-recent message is older than
-  WINDOW_MAX_AGE_MINUTES (default 240 min). Applies regardless of termination status.
-- Rationale: users expect to see all station calls for an active service.
-  Truncating to 10 messages created confusing incomplete timelines in the drilldown.
+- Rule 2 (max age): differentiated by service status:
+    - Cancelled or terminated: WINDOW_MAX_AGE_MINUTES (default 240 min / 4 hrs)
+    - Zombie (no cancel/terminate ever received): WINDOW_MAX_AGE_ZOMBIE_MINUTES (default 480 min / 8 hrs)
+- Background sweep: daemon thread in MessageStore runs every 10 min and walks the entire
+  store. Fixes original bug where Rule 2 only fired on append() — services that went silent
+  were never evicted. start_sweep() called on startup; stop_sweep() on shutdown.
 
 ### Delay calculation
 - Primary: actual_timestamp_ms - gbtt_timestamp_ms

@@ -35,6 +35,17 @@ event timelines in drilldown for long-distance services — users saw only last 
 Updated: Rule 1 only applies to terminated services. Non-terminated services are
 evicted only by Rule 2 (max-age). Memory impact is negligible at observed scale.
 
+**Eviction: background sweep + differentiated max-age** (updated March 2026):
+Original Rule 2 only fired inside append(), so services that went silent after their last
+message were never evicted — cancelled and terminated services lingered for 10+ hours
+overnight. Fix: a daemon thread (eviction-sweep) runs _eviction_sweep() every 10 minutes,
+walking the entire store and applying Rule 2 to all train_ids.
+Differentiated age thresholds (user decision):
+  • Cancelled or terminated → 240 min (4 hrs): useful for controllers to refer back.
+  • Zombie (no cancel/terminate received) → 480 min (8 hrs): TRUST data entry omission;
+    longer window avoids prematurely dropping services that are legitimately between
+    reporting points on sparse routes.
+
 ## Frontend
 
 **TRUST ID always shown alongside headcode**: headcode (4-char) is not unique within
